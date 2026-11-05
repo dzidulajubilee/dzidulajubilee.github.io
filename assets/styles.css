@@ -172,6 +172,8 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .l3 span { display: block; font: 400 11px/14px var(--mono); color: var(--text-2); }
 .l3-left { text-align: left; }
 .l3-fw b { font: 400 11px/14px var(--mono); color: var(--amber); }
+.l3-floor b { font: 400 11px/14px var(--mono); color: var(--text-3); }
+.l3-bad span { color: var(--sev-1); }
 
 .eyebrow { color: var(--text-3); font-size: 13px; margin-bottom: 20px; }
 h1 {

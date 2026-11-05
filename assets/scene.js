@@ -1,5 +1,5 @@
-// Hero scene: four example network designs as physical objects, with live traffic.
-// Designs are generic reference layouts, not any real site.
+// Hero scene: four example network architectures as physical objects with live traffic.
+// All designs are generic reference architectures, not any real site.
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "./vendor/RoundedBoxGeometry.js";
 import { CSS2DRenderer, CSS2DObject } from "./vendor/CSS2DRenderer.js";
@@ -7,7 +7,9 @@ import { CSS2DRenderer, CSS2DObject } from "./vendor/CSS2DRenderer.js";
 const hero = document.querySelector(".hero");
 const mount = document.getElementById("scene");
 const hud = document.querySelector(".hud");
-const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const params = new URLSearchParams(location.search);
+const CAPTURE = params.has("capture"); // deterministic frames for the GitHub banner
+const reduceMotion = !CAPTURE && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 function webglOK() {
   try {
@@ -20,83 +22,12 @@ if (hero && mount && hud && webglOK()) init();
 
 function init() {
   hero.classList.add("has-3d"); // make the mount visible before measuring it
-  // ---------- Designs, drawn on a 480 x 340 plan (same as the SVG fallback) ----------
-  const DESIGNS = [
-    {
-      name: "Segmented office",
-      caption: "Staff, servers and visitors only reach each other through firewall rules",
-      nodes: [
-        { x: 180, y: 16, w: 120, h: 44, t: "Internet", k: "edge" },
-        { x: 180, y: 100, w: 120, h: 44, t: "Firewall", k: "key" },
-        { x: 180, y: 184, w: 120, h: 44, t: "Switch" },
-        { x: 24, y: 272, w: 128, h: 44, t: "Staff", k: "zone" },
-        { x: 176, y: 272, w: 128, h: 44, t: "Servers", k: "zone" },
-        { x: 328, y: 272, w: 128, h: 44, t: "Visitors", k: "zone" },
-      ],
-      links: [
-        [[240, 60], [240, 100]], [[240, 144], [240, 184]], [[240, 228], [240, 248]],
-        [[88, 248], [392, 248]], [[88, 248], [88, 272]], [[240, 248], [240, 272]], [[392, 248], [392, 272]],
-      ],
-      flows: [
-        { p: [[240, 38], [240, 248], [88, 248], [88, 294]] },
-        { p: [[240, 38], [240, 294]] },
-        { p: [[392, 294], [392, 248], [240, 248], [240, 38]] },
-      ],
-    },
-    {
-      name: "Redundant edge",
-      caption: "Two internet links and a standby firewall, so one failure is not an outage",
-      nodes: [
-        { x: 40, y: 16, w: 120, h: 44, t: "ISP A", k: "edge" },
-        { x: 320, y: 16, w: 120, h: 44, t: "ISP B", k: "edge" },
-        { x: 40, y: 128, w: 140, h: 52, t: "Firewall", s: "active", k: "ok" },
-        { x: 300, y: 128, w: 140, h: 52, t: "Firewall", s: "standby", k: "standby" },
-        { x: 170, y: 256, w: 140, h: 44, t: "Core switch" },
-      ],
-      links: [
-        [[100, 60], [100, 96]], [[380, 60], [380, 96]], [[100, 96], [380, 96]], [[110, 96], [110, 128]],
-        [[110, 180], [110, 220], [220, 220], [220, 256]],
-        { p: [[370, 96], [370, 128]], dash: true },
-        { p: [[370, 180], [370, 220], [260, 220], [260, 256]], dash: true },
-      ],
-      flows: [
-        { p: [[100, 38], [100, 96], [110, 96], [110, 220], [220, 220], [220, 278]] },
-        { p: [[380, 38], [380, 96], [110, 96], [110, 220], [220, 220], [220, 278]] },
-      ],
-    },
-    {
-      name: "Multi-site VPN",
-      caption: "Branches and remote staff joined to head office over encrypted tunnels",
-      nodes: [
-        { x: 160, y: 40, w: 160, h: 52, t: "Head office", s: "VPN hub", k: "key" },
-        { x: 24, y: 248, w: 128, h: 44, t: "Branch A", k: "zone" },
-        { x: 176, y: 248, w: 128, h: 44, t: "Branch B", k: "zone" },
-        { x: 328, y: 248, w: 128, h: 44, t: "Remote staff", k: "zone" },
-      ],
-      links: [
-        { p: [[240, 92], [88, 248]], dash: true },
-        { p: [[240, 92], [240, 248]], dash: true },
-        { p: [[240, 92], [392, 248]], dash: true },
-      ],
-      flows: [
-        { p: [[88, 270], [240, 66]], amber: true },
-        { p: [[240, 66], [240, 270]], amber: true },
-        { p: [[392, 270], [240, 66]], amber: true },
-      ],
-    },
-    {
-      name: "Industrial layers",
-      caption: "Plant equipment kept apart from the business network, with a buffer zone between",
-      stack: true,
-      layers: ["Business network", "DMZ", "Control systems", "Field devices"],
-      gates: [0, 1], // firewalls between layers 0-1 and 1-2
-    },
-  ];
 
   // ---------- Renderer ----------
   const BG = new THREE.Color("#0b0d14");
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance", preserveDrawingBuffer: CAPTURE });
+  const small = window.innerWidth <= 1040;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, small ? 1.5 : 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.05;
@@ -111,223 +42,504 @@ function init() {
 
   const scene = new THREE.Scene();
   scene.background = BG;
-  scene.fog = new THREE.Fog(BG, 52, 120);
+  scene.fog = new THREE.Fog(BG, 70, 170);
+  const camera = new THREE.PerspectiveCamera(30, 1, 0.5, 500);
 
-  const camera = new THREE.PerspectiveCamera(30, 1, 0.5, 400);
-
-  // ---------- Light: a quiet room with one pool of light that follows the design ----------
   scene.add(new THREE.HemisphereLight("#a9b4d0", "#07080d", 1.1));
-  const key = new THREE.SpotLight("#f4f1ea", 4.2, 0, 0.5, 0.9, 0);
+  const key = new THREE.SpotLight("#f4f1ea", 4.4, 0, 0.62, 0.9, 0);
   key.castShadow = true;
-  key.shadow.mapSize.set(2048, 2048);
+  key.shadow.mapSize.set(small ? 1024 : 2048, small ? 1024 : 2048);
   key.shadow.bias = -0.0004;
-  key.shadow.radius = 6;
+  key.shadow.radius = 5;
+  key.shadow.camera.near = 10;
+  key.shadow.camera.far = 140;
   scene.add(key, key.target);
   const rim = new THREE.DirectionalLight("#8b9bc4", 1.1);
   scene.add(rim, rim.target);
 
-  // Floor
   const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(800, 300),
+    new THREE.PlaneGeometry(1200, 400),
     new THREE.MeshStandardMaterial({ color: "#151925", roughness: 0.9, metalness: 0.05 })
   );
   floor.rotation.x = -Math.PI / 2;
   floor.receiveShadow = true;
   scene.add(floor);
 
-  // ---------- Materials ----------
+  // ---------- Materials and shared geometry ----------
+  const std = (color, roughness, metalness) => new THREE.MeshStandardMaterial({ color, roughness, metalness });
+  const basic = (color, extra = {}) => new THREE.MeshBasicMaterial({ color, ...extra });
   const M = {
-    body: new THREE.MeshStandardMaterial({ color: "#363d52", roughness: 0.55, metalness: 0.35 }),
-    zone: new THREE.MeshStandardMaterial({ color: "#272d3d", roughness: 0.7, metalness: 0.2 }),
-    edge: new THREE.MeshStandardMaterial({ color: "#3d4559", roughness: 0.5, metalness: 0.3 }),
-    wire: new THREE.MeshStandardMaterial({ color: "#6d7690", roughness: 0.6, metalness: 0.1 }),
-    dash: new THREE.MeshBasicMaterial({ color: "#e8a33d", transparent: true, opacity: 0.85 }),
-    ledOk: new THREE.MeshBasicMaterial({ color: "#4cc38a" }),
-    ledAmber: new THREE.MeshBasicMaterial({ color: "#e8a33d" }),
-    ledDim: new THREE.MeshBasicMaterial({ color: "#7a8296" }),
-    pktWhite: new THREE.MeshBasicMaterial({ color: "#eef0f5" }),
-    pktAmber: new THREE.MeshBasicMaterial({ color: "#f0b45a" }),
-    port: new THREE.MeshStandardMaterial({ color: "#0b0d14", roughness: 0.4, metalness: 0.6 }),
+    body: std("#363d52", 0.55, 0.35),
+    edge: std("#3d4559", 0.5, 0.3),
+    zone: std("#272d3d", 0.7, 0.2),
+    rack: std("#1c2130", 0.45, 0.5),
+    port: std("#0b0d14", 0.4, 0.6),
+    wire: std("#6d7690", 0.6, 0.1),
+    wireA: std("#6d7690", 0.6, 0.1), // links through the active firewall (dim when it fails)
+    dash: basic("#e8a33d", { transparent: true, opacity: 0.85 }),
+    ledOk: basic("#4cc38a"), ledAmber: basic("#e8a33d"), ledDim: basic("#7a8296"), ledRed: basic("#e5484d"),
+    unitDim: basic("#2c3344"), unitOn: basic("#8fa0c8"),
+    pktWhite: basic("#eef0f5"), pktAmber: basic("#f0b45a"),
+  };
+  const geoCache = new Map();
+  const rbox = (w, h, d, r = 0.08) => {
+    const k = [w, h, d, r].join();
+    if (!geoCache.has(k)) geoCache.set(k, new RoundedBoxGeometry(w, h, d, 2, Math.min(r, h / 2.2, d / 2.2)));
+    return geoCache.get(k);
+  };
+  const box = (w, h, d) => {
+    const k = "b" + [w, h, d].join();
+    if (!geoCache.has(k)) geoCache.set(k, new THREE.BoxGeometry(w, h, d));
+    return geoCache.get(k);
+  };
+  const pktGeo = new THREE.SphereGeometry(0.12, 14, 10);
+  const apGeo = new THREE.CylinderGeometry(0.42, 0.46, 0.14, 28);
+
+  const KINDS = {
+    router: { w: 2.4, h: 0.5, d: 1.3, mat: "edge", ports: 6 },
+    fw: { w: 2.6, h: 0.6, d: 1.4, mat: "body", ports: 6 },
+    switch: { w: 2.6, h: 0.42, d: 1.2, mat: "body", ports: 8 },
+    core: { w: 3.2, h: 0.8, d: 1.6, mat: "body", ports: 10 },
+    server: { w: 1.2, h: 0.34, d: 1.3, mat: "body", ports: 2 },
+    rack: { w: 1.2, h: 2.6, d: 1.4, mat: "rack" },
+    pc: { w: 0.8, h: 0.42, d: 0.55, mat: "edge" },
+    plc: { w: 0.6, h: 0.55, d: 0.45, mat: "edge" },
+    ap: { w: 0.9, h: 0.14, d: 0.9 },
+    cloud: { w: 8, h: 0.34, d: 2.6, mat: "zone" },
   };
 
-  const S = 20;           // plan pixels per world unit
-  const SPACING = 64;     // distance between designs along x
-  const toWorld = (d, [px, py], y = 0) => new THREE.Vector3(d * SPACING + (px - 240) / S, y, (py - 170) / S);
-
-  const groups = [];
+  const SPACING = 110;
+  const designs = [];
   const flows = [];
-  const pktGeo = new THREE.SphereGeometry(0.11, 16, 12);
-  const portGeo = new THREE.BoxGeometry(0.13, 0.1, 0.02);
+  const failover = { fwA: null, fwB: null, labelA: null, labelB: null, state: "ok" };
 
-  DESIGNS.forEach((design, d) => {
+  // ---------- Builder API for one design ----------
+  function makeDesign(d, meta) {
     const g = new THREE.Group();
+    const X = d * SPACING;
+    const dev = {};
     const labelEls = [];
 
-    if (design.stack) {
-      buildStack(design, d, g, labelEls);
-      scene.add(g);
-      groups.push({ g, labelEls, center: new THREE.Vector3(d * SPACING - 1.5, 3.6, 0), pitch: 0.3 });
-      return;
-    }
-
-    // Devices
-    for (const n of design.nodes) {
-      const w = n.w / S, depth = n.h / S;
-      const h = n.k === "zone" ? 0.42 : n.k === "fw" ? 0.5 : 0.78;
-      const mat = n.k === "zone" ? M.zone : n.k === "edge" ? M.edge : M.body;
-      const box = new THREE.Mesh(new RoundedBoxGeometry(w, h, depth, 3, Math.min(0.12, depth / 4)), mat);
-      const c = toWorld(d, [n.x + n.w / 2, n.y + n.h / 2], h / 2);
-      box.position.copy(c);
-      box.castShadow = true;
-      box.receiveShadow = true;
-      g.add(box);
-
-      // Status light on the front face
-      const ledMat = n.k === "ok" ? M.ledOk
-        : (n.k === "key" || n.k === "standby" || n.k === "fw") ? M.ledAmber
-        : M.ledDim;
-      const led = new THREE.Mesh(new THREE.BoxGeometry(Math.min(0.5, w * 0.25), 0.06, 0.02), ledMat);
-      led.position.set(c.x - w / 2 + Math.min(0.5, w * 0.25) / 2 + 0.22, c.y + h * 0.12, c.z + depth / 2 + 0.005);
-      g.add(led);
-
-      // A row of ports on the right of the front face, so devices read as network gear
-      if (n.k !== "zone" && n.k !== "fw") {
-        for (let q = 0; q < 6; q++) {
-          const port = new THREE.Mesh(portGeo, M.port);
-          port.position.set(c.x + w / 2 - 0.36 - q * 0.2, c.y + h * 0.05, c.z + depth / 2 + 0.006);
-          g.add(port);
-        }
-      }
-
-      // Standby unit gets a dashed amber outline on the floor
-      if (n.k === "standby") dashedRect(g, d, n);
-
-      // Label printed on the top face
+    function label(text, pos, { sub, kind, left } = {}) {
       const el = document.createElement("div");
-      el.className = "l3" + (n.k === "fw" ? " l3-fw" : "") + (n.left ? " l3-left" : "");
-      el.innerHTML = "<b></b>" + (n.s ? "<span></span>" : "");
-      el.querySelector("b").textContent = n.t;
-      if (n.s) el.querySelector("span").textContent = n.s;
+      el.className = "l3" + (kind ? " l3-" + kind : "") + (left ? " l3-left" : "");
+      el.innerHTML = "<b></b>" + (sub ? "<span></span>" : "");
+      el.querySelector("b").textContent = text;
+      if (sub) el.querySelector("span").textContent = sub;
       const obj = new CSS2DObject(el);
-      const lx = n.left ? n.x + 24 : n.x + n.w / 2;
-      obj.position.copy(toWorld(d, [lx, n.y + n.h / 2], h + 0.02));
-      if (n.left) obj.center.set(0, 0.5);
+      if (left) obj.center.set(0, 0.5);
+      obj.position.copy(pos);
       g.add(obj);
       labelEls.push(el);
+      return el;
     }
 
-    // Links on the floor
-    for (const l of design.links) {
-      const pts = Array.isArray(l) ? l : l.p;
-      const dash = !Array.isArray(l) && l.dash;
-      for (let i = 0; i < pts.length - 1; i++) {
-        const a = toWorld(d, pts[i], 0.03), b = toWorld(d, pts[i + 1], 0.03);
-        dash ? dashedSegment(g, a, b) : solidSegment(g, a, b);
+    function add(id, kind, x, z, opt = {}) {
+      const K = KINDS[kind];
+      const base = opt.y || 0;
+      const p = new THREE.Vector3(X + x, base, z);
+      const top = base + K.h;
+      if (kind === "ap") {
+        const m = new THREE.Mesh(apGeo, M.edge);
+        m.position.set(p.x, base + K.h / 2, z);
+        m.castShadow = true; g.add(m);
+        const dot = new THREE.Mesh(box(0.16, 0.02, 0.16), M.ledOk);
+        dot.position.set(p.x, base + K.h + 0.01, z); g.add(dot);
+      } else {
+        const m = new THREE.Mesh(rbox(K.w, K.h, K.d, kind === "rack" ? 0.06 : 0.1), M[K.mat]);
+        m.position.set(p.x, base + K.h / 2, z);
+        m.castShadow = true; m.receiveShadow = true; g.add(m);
+        const front = z + K.d / 2 + 0.006;
+        if (kind === "rack") {
+          for (let u = 0; u < 8; u++) {
+            const lit = (u * 7 + Math.round(x * 3) + d) % 3 === 0;
+            const unit = new THREE.Mesh(box(K.w * 0.78, 0.05, 0.02), lit ? M.unitOn : M.unitDim);
+            unit.position.set(p.x, base + 0.35 + u * 0.28, front);
+            g.add(unit);
+          }
+        } else if (kind !== "cloud") {
+          const ledMat = opt.led === "ok" ? M.ledOk : opt.led === "amber" ? M.ledAmber : M.ledDim;
+          const lw = Math.min(0.45, K.w * 0.28);
+          const led = new THREE.Mesh(box(lw, 0.06, 0.02), ledMat);
+          led.position.set(p.x - K.w / 2 + lw / 2 + 0.18, base + K.h * 0.62, front);
+          g.add(led);
+          dev[id + ":led"] = led;
+          for (let q = 0; q < (K.ports || 0); q++) {
+            const port = new THREE.Mesh(box(0.13, 0.1, 0.02), M.port);
+            port.position.set(p.x + K.w / 2 - 0.3 - q * 0.19, base + K.h * 0.38, front);
+            g.add(port);
+          }
+        }
+      }
+      dev[id] = { p, top, kind };
+      if (opt.label) dev[id + ":label"] = label(opt.label, new THREE.Vector3(p.x, top + 0.02, z), { sub: opt.sub });
+      return dev[id];
+    }
+
+    // A device id, or [x, z, y] in this design's local coordinates
+    const at = (ref, y = 0.03) => {
+      if (Array.isArray(ref)) return new THREE.Vector3(X + ref[0], ref[2] !== undefined ? ref[2] : y, ref[1]);
+      const D = dev[ref];
+      return new THREE.Vector3(D.p.x, D.p.y + y, D.p.z);
+    };
+
+    function segment(a, b, dash, mat) {
+      const len = a.distanceTo(b);
+      if (len < 0.01) return;
+      const dir = b.clone().sub(a).normalize();
+      if (!dash) {
+        const m = new THREE.Mesh(box(0.07, 0.05, 1), mat || M.wire);
+        m.scale.z = len;
+        m.position.copy(a).add(b).multiplyScalar(0.5);
+        m.lookAt(m.position.clone().add(dir));
+        g.add(m);
+        return;
+      }
+      const DASH = 0.34, GAP = 0.24;
+      for (let s = 0; s < len; s += DASH + GAP) {
+        const l = Math.min(DASH, len - s);
+        const m = new THREE.Mesh(box(0.07, 0.045, 1), mat || M.dash);
+        m.scale.z = l;
+        m.position.copy(a).addScaledVector(dir, s + l / 2);
+        m.lookAt(m.position.clone().add(dir));
+        g.add(m);
       }
     }
+    function link(a, b, { dash = false, mat = null, via = [] } = {}) {
+      const pts = [at(a), ...via.map((v) => at(v)), at(b)];
+      for (let i = 0; i < pts.length - 1; i++) segment(pts[i], pts[i + 1], dash, mat);
+    }
+    function post(a, b) {
+      const m = new THREE.Mesh(box(0.07, a.distanceTo(b), 0.07), M.wire);
+      m.position.copy(a).add(b).multiplyScalar(0.5);
+      g.add(m);
+    }
 
-    // Traffic
-    for (const f of design.flows) {
-      const pts = f.p.map((p) => toWorld(d, p, 0.16));
+    function flow(route, { amber = false, tag = null, speed } = {}) {
+      const pts = route.map((r) => (r instanceof THREE.Vector3 ? r : at(r, 0.2)));
       const lens = [];
       let total = 0;
       for (let i = 0; i < pts.length - 1; i++) { const L = pts[i].distanceTo(pts[i + 1]); lens.push(L); total += L; }
-      const count = Math.max(2, Math.round(total / 4));
+      const count = Math.max(2, Math.round(total / 3.2));
       const meshes = [];
-      for (let k = 0; k < count; k++) {
-        const m = new THREE.Mesh(pktGeo, f.amber ? M.pktAmber : M.pktWhite);
-        g.add(m);
-        meshes.push(m);
-      }
-      flows.push({ d, pts, lens, total, meshes, speed: f.amber ? 2.6 : 3.4, offset: Math.random() * total });
+      for (let k = 0; k < count; k++) { const m = new THREE.Mesh(pktGeo, amber ? M.pktAmber : M.pktWhite); g.add(m); meshes.push(m); }
+      flows.push({ d, pts, lens, total, meshes, tag, speed: speed || (amber ? 3.2 : 4.2), offset: (d * 7.3 + flows.length * 2.9) % total });
     }
 
-    scene.add(g);
-    groups.push({ g, labelEls, center: toWorld(d, [240, 168], 0), pitch: 0.56 });
-  });
+    const tag = (text, x, z, y = 0.02) => label(text, new THREE.Vector3(X + x, y, z), { kind: "floor" });
 
-  // Layers as floating plates, top to bottom, with firewall gates between them
-  function buildStack(design, d, g, labelEls) {
-    const X = d * SPACING, W = 20, D = 7, T = 0.3, GAP = 2.4;
-    const n = design.layers.length;
-    const yOf = (i) => 0.15 + (n - 1 - i) * GAP; // layer 0 is the top
-    const fx = X + 5.5, fz = D / 2 - 1.1;         // where links and gates run
-    design.layers.forEach((name, i) => {
-      const plate = new THREE.Mesh(new RoundedBoxGeometry(W, T, D, 3, 0.1), i === n - 1 ? M.zone : M.body);
-      plate.position.set(X, yOf(i), 0);
+    return { g, X, dev, add, link, post, flow, tag, label, at, labelEls, meta };
+  }
+
+  // ---------- 1. Enterprise campus, with a live firewall failover ----------
+  {
+    const D = makeDesign(0, {
+      name: "Enterprise campus",
+      caption: "Redundant at every layer. Watch the active firewall fail and the standby take over",
+      pitch: 0.66, size: 40, center: [0.5, -1.5],
+    });
+    const { add, link, flow, tag } = D;
+    add("ispA", "router", -5, -12.5, { label: "ISP A" });
+    add("ispB", "router", 5, -12.5, { label: "ISP B" });
+    add("fwA", "fw", -4, -8, { label: "Firewall", sub: "active", led: "ok" });
+    add("fwB", "fw", 4, -8, { label: "Firewall", sub: "standby", led: "amber" });
+    add("dmz", "switch", -12.5, -8, { label: "DMZ" });
+    add("dmz0", "server", -13.6, -5); add("dmz1", "server", -11.4, -5);
+    add("c1", "core", -3.6, -3, { label: "Core" });
+    add("c2", "core", 3.6, -3, { label: "Core" });
+    const ax = [-11.5, -3.8, 3.8, 11.5];
+    ax.forEach((x, i) => add("a" + i, "switch", x, 2));
+    for (const [ai, x0] of [[0, ax[0]], [1, ax[1]]]) {
+      let n = 0;
+      for (const dz of [5.4, 6.9]) for (const dx of [-1.3, 0, 1.3]) { add(`pc${ai}_${n}`, "pc", x0 + dx, dz); link("a" + ai, `pc${ai}_${n}`); n++; }
+    }
+    [-1.4, 0, 1.4].forEach((dx, k) => { add("ap" + k, "ap", ax[2] + dx, 5.8); link("a2", "ap" + k); });
+    [-1.4, 0, 1.4].forEach((dx, k) => { add("r" + k, "rack", ax[3] + dx, 5.8); link("a3", "r" + k); });
+    tag("Floor 1", ax[0], 8.9); tag("Floor 2", ax[1], 8.9); tag("Wi-Fi", ax[2], 8.9); tag("Server room", ax[3], 8.9);
+    link("ispA", "fwA", { mat: M.wireA }); link("ispB", "fwA", { mat: M.wireA });
+    link("ispA", "fwB", { dash: true }); link("ispB", "fwB", { dash: true });
+    link("fwA", "c1", { mat: M.wireA }); link("fwA", "c2", { mat: M.wireA });
+    link("fwB", "c1", { dash: true }); link("fwB", "c2", { dash: true });
+    link("fwA", "dmz", { mat: M.wireA }); link("dmz", "dmz0"); link("dmz", "dmz1");
+    link("c1", "c2");
+    ax.forEach((x, i) => { link("c1", "a" + i); link("c2", "a" + i); });
+    flow(["ispA", "fwA", "c1", "a0", "pc0_1"], { tag: "A" });
+    flow(["ispB", "fwA", "c2", "a3", "r1"], { tag: "A" });
+    flow(["ispA", "fwA", "dmz", "dmz0"], { tag: "A" });
+    flow(["ispA", "fwB", "c1", "a0", "pc0_1"], { tag: "B", amber: true });
+    flow(["ispB", "fwB", "c2", "a3", "r1"], { tag: "B", amber: true });
+    flow(["pc1_4", "a1", "c1", "a3", "r0"]);
+    flow(["ap1", "a2", "c2", "a3", "r2"]);
+    failover.fwA = D.dev["fwA:led"]; failover.fwB = D.dev["fwB:led"];
+    failover.labelA = D.dev["fwA:label"]; failover.labelB = D.dev["fwB:label"];
+    designs.push(D);
+  }
+
+  // ---------- 2. Data centre spine and leaf ----------
+  {
+    const D = makeDesign(1, {
+      name: "Data centre fabric",
+      caption: "Spine and leaf: every leaf connects to every spine, so any rack is two hops from any other",
+      pitch: 0.58, size: 38, center: [2, -5],
+    });
+    const { add, link, flow } = D;
+    add("s1", "core", -5, -9, { label: "Spine" });
+    add("s2", "core", 5, -9, { label: "Spine" });
+    const lx = [-12, -4, 4, 12];
+    lx.forEach((x, i) => {
+      add("l" + i, "switch", x, -2, { label: "Leaf" });
+      add(`r${i}a`, "rack", x - 0.8, 2); add(`r${i}b`, "rack", x + 0.8, 2);
+      link("l" + i, `r${i}a`); link("l" + i, `r${i}b`);
+      link("s1", "l" + i); link("s2", "l" + i);
+    });
+    add("border", "switch", 16, -9, { label: "Border leaf" });
+    add("fw", "fw", 16, -13, { label: "Firewall", led: "ok" });
+    add("inet", "router", 16, -17, { label: "Internet" });
+    link("s1", "border"); link("s2", "border"); link("border", "fw"); link("fw", "inet");
+    flow(["r0a", "l0", "s1", "l2", "r2b"]);
+    flow(["r3a", "l3", "s2", "l1", "r1a"]);
+    flow(["r1b", "l1", "s1", "l0", "r0b"]);
+    flow(["inet", "fw", "border", "s2", "l3", "r3b"]);
+    flow(["r2a", "l2", "s2", "l3", "r3a"]);
+    designs.push(D);
+  }
+
+  // ---------- 3. Multi-site WAN ----------
+  {
+    const D = makeDesign(2, {
+      name: "Multi-site WAN",
+      caption: "Five branches with encrypted tunnels to both head office and the DR site, plus a link to the cloud",
+      pitch: 0.64, size: 40, center: [0, -0.5],
+    });
+    const { add, link, flow, tag } = D;
+    add("cloud", "cloud", 0, -12, { label: "Cloud" });
+    add("hq", "fw", -9, -5, { label: "Head office", led: "ok" });
+    add("hqsw", "switch", -9, -2); add("hqr0", "rack", -10.4, 1); add("hqr1", "rack", -7.6, 1);
+    add("dr", "fw", 9, -5, { label: "DR site", led: "amber" });
+    add("drsw", "switch", 9, -2); add("drr0", "rack", 9, 1);
+    link("hq", "hqsw"); link("hqsw", "hqr0"); link("hqsw", "hqr1");
+    link("dr", "drsw"); link("drsw", "drr0");
+    link("hq", "dr");
+    link("hq", "cloud", { dash: true }); link("dr", "cloud", { dash: true });
+    const bx = [-14, -7, 0, 7, 14];
+    bx.forEach((x, i) => {
+      add("b" + i, "router", x, 8);
+      add(`b${i}p0`, "pc", x - 0.7, 10.6); add(`b${i}p1`, "pc", x + 0.7, 10.6);
+      link("b" + i, `b${i}p0`); link("b" + i, `b${i}p1`);
+      link("b" + i, "hq", { dash: true }); link("b" + i, "dr", { dash: true });
+    });
+    tag("Branches", 0, 12.8);
+    flow(["b0p0", "b0", "hq", "hqsw", "hqr0"], { amber: true });
+    flow(["b1", "hq"], { amber: true });
+    flow(["b2p1", "b2", "hq", "hqsw", "hqr1"], { amber: true });
+    flow(["b3", "dr"], { amber: true });
+    flow(["b4p0", "b4", "hq"], { amber: true });
+    flow(["hqr1", "hqsw", "hq", "dr", "drsw", "drr0"]);
+    flow(["hq", "cloud"], { amber: true });
+    designs.push(D);
+  }
+
+  // ---------- 4. Industrial defence in depth: layers stacked as floating plates ----------
+  {
+    const D = makeDesign(3, {
+      name: "Industrial defence in depth",
+      caption: "Each layer of the plant sits behind its own firewall, and nothing crosses the whole stack",
+      pitch: 0.5, size: 38, center: [0, 0.5], y: 3.6,
+    });
+    const { g, X, add, link, post, flow, label } = D;
+    const names = ["Business network", "DMZ", "Control systems", "Field devices"];
+    const W = 24, DP = 8.5, T = 0.3, GAP = 2.9, STEP = 2.8;
+    const yOf = (i) => 0.15 + (3 - i) * GAP;
+    const top = (i) => yOf(i) + T / 2;
+    const zOf = (i) => (i - 1.5) * STEP;          // each lower layer steps toward the viewer
+    const front = (i) => zOf(i) + DP / 2 - 1.3;    // the strip left uncovered by the layer above
+    const fx = 9;
+    names.forEach((name, i) => {
+      const plate = new THREE.Mesh(rbox(W, T, DP, 0.1), i === 3 ? M.zone : M.body);
+      plate.position.set(X, yOf(i), zOf(i));
       plate.castShadow = true; plate.receiveShadow = true;
       g.add(plate);
-      const led = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.06, 0.02), M.ledDim);
-      led.position.set(X - W / 2 + 0.6, yOf(i), D / 2 + 0.005);
-      g.add(led);
-      const el = document.createElement("div");
-      el.className = "l3 l3-left";
-      el.innerHTML = "<b></b>";
-      el.querySelector("b").textContent = name;
-      const obj = new CSS2DObject(el);
-      obj.center.set(0, 0.5);
-      obj.position.set(X - W / 2 + 0.8, yOf(i) + T / 2 + 0.02, D / 2 - 1.1);
-      g.add(obj);
-      labelEls.push(el);
-      // vertical link to the layer below
-      if (i < n - 1) {
-        const top = yOf(i) - T / 2, bottom = yOf(i + 1) + T / 2;
-        const post = new THREE.Mesh(new THREE.BoxGeometry(0.07, top - bottom, 0.07), M.wire);
-        post.position.set(fx, (top + bottom) / 2, fz);
-        g.add(post);
-        if (design.gates.includes(i)) {
-          const gate = new THREE.Mesh(new RoundedBoxGeometry(1.6, 0.5, 0.8, 2, 0.08), M.body);
-          gate.position.set(fx, (top + bottom) / 2, fz);
-          gate.castShadow = true;
-          g.add(gate);
-          const gl = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.06, 0.02), M.ledAmber);
-          gl.position.set(fx - 0.4, (top + bottom) / 2 + 0.06, fz + 0.405);
-          g.add(gl);
-          const ge = document.createElement("div");
-          ge.className = "l3 l3-fw l3-left";
-          ge.innerHTML = "<b>firewall</b>";
-          const go2 = new CSS2DObject(ge);
-          go2.center.set(0, 0.5);
-          go2.position.set(fx + 1.1, (top + bottom) / 2, fz + 0.4);
-          g.add(go2);
-          labelEls.push(ge);
-        }
-      }
+      label(name, new THREE.Vector3(X - W / 2 + 0.8, top(i) + 0.02, zOf(i) + DP / 2 - 0.5), { left: true });
+      add("sw" + i, "switch", fx - 3.6, front(i), { y: top(i) });
     });
-    // Traffic: business to DMZ, field to control. Nothing crosses the whole stack
-    const path = (from, to) => [new THREE.Vector3(fx, yOf(from), fz), new THREE.Vector3(fx, yOf(to), fz)];
-    for (const [a, b] of [[0, 1], [3, 2]]) {
-      const pts = path(a, b);
-      const total = pts[0].distanceTo(pts[1]);
-      const meshes = [0, 1].map(() => { const m = new THREE.Mesh(pktGeo, M.pktWhite); g.add(m); return m; });
-      flows.push({ d, pts, lens: [total], total, meshes, speed: 1.6, offset: Math.random() * total });
+    [-6.5, -5.1, -3.7, -2.3].forEach((x, k) => { add("pc" + k, "pc", x, front(0), { y: top(0) }); link("sw0", "pc" + k); });
+    [0.2, 1.8].forEach((x, k) => { add("bs" + k, "server", x, front(0), { y: top(0) }); link("sw0", "bs" + k); });
+    [-3.4, -1.8, -0.2].forEach((x, k) => { add("dz" + k, "server", x, front(1), { y: top(1) }); link("sw1", "dz" + k); });
+    [-6.2, -4.8].forEach((x, k) => { add("hmi" + k, "pc", x, front(2), { y: top(2) }); link("sw2", "hmi" + k); });
+    [-2.2, -0.6].forEach((x, k) => { add("sc" + k, "server", x, front(2), { y: top(2) }); link("sw2", "sc" + k); });
+    [-6.6, -5.4, -4.2, -3, -1.8, -0.6].forEach((x, k) => { add("plc" + k, "plc", x, front(3), { y: top(3) }); link("sw3", "plc" + k); });
+    // Each switch drops to the layer below through a post, with a firewall on the upper two
+    for (let i = 0; i < 3; i++) {
+      const z = front(i);
+      const a = new THREE.Vector3(X + fx, yOf(i) - T / 2, z), b = new THREE.Vector3(X + fx, top(i + 1), z);
+      link("sw" + i, [fx, z, top(i) + 0.03]);
+      link("sw" + (i + 1), [fx, z, top(i + 1) + 0.03], { via: [[fx, front(i + 1), top(i + 1) + 0.03]] });
+      post(a, b);
+      if (i < 2) {
+        const mid = (a.y + b.y) / 2;
+        const gate = new THREE.Mesh(rbox(1.8, 0.55, 0.9, 0.08), M.body);
+        gate.position.set(X + fx, mid, z); gate.castShadow = true; g.add(gate);
+        const gl = new THREE.Mesh(box(0.4, 0.06, 0.02), M.ledAmber);
+        gl.position.set(X + fx - 0.5, mid + 0.08, z + 0.456); g.add(gl);
+        label("firewall", new THREE.Vector3(X + fx + 1.2, mid, z + 0.45), { kind: "fw", left: true });
+      }
     }
+    const V = (x, y, z) => new THREE.Vector3(X + x, y, z);
+    flow([D.at("pc1", 0.2), D.at("sw0", 0.2), V(fx, top(0) + 0.2, front(0)), V(fx, top(1) + 0.2, front(0)), V(fx, top(1) + 0.2, front(1)), D.at("sw1", 0.2), D.at("dz1", 0.2)], { speed: 2.6 });
+    flow([D.at("plc2", 0.2), D.at("sw3", 0.2), V(fx, top(3) + 0.2, front(3)), V(fx, top(3) + 0.2, front(2)), V(fx, top(2) + 0.2, front(2)), D.at("sw2", 0.2), D.at("hmi0", 0.2)], { speed: 2.6 });
+    flow([D.at("sc0", 0.2), D.at("sw2", 0.2), D.at("hmi1", 0.2)], { speed: 2.2 });
+    designs.push(D);
   }
 
-  function solidSegment(g, a, b) {
-    const len = a.distanceTo(b);
-    const m = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.05, len), M.wire);
-    m.position.copy(a).add(b).multiplyScalar(0.5);
-    m.lookAt(b.x, m.position.y, b.z);
-    m.receiveShadow = true;
-    g.add(m);
+  designs.forEach((D, k) => {
+    const m = D.meta;
+    D.center = new THREE.Vector3(k * SPACING + m.center[0], m.y || 0, m.center[1]);
+    scene.add(D.g);
+  });
+
+  // ---------- Camera ----------
+  const view = { yaw: -0.42, pitch: designs[0].meta.pitch, size: designs[0].meta.size };
+  let W = 1, H = 1, desktop = true;
+  const tanHalf = () => Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  function distFor(size) {
+    const portion = CAPTURE ? 0.58 : desktop ? 0.6 : 1.04;
+    return Math.max((size / portion) / (2 * tanHalf() * camera.aspect), (size * 0.62) / (2 * tanHalf()));
   }
-  function dashedSegment(g, a, b) {
-    const len = a.distanceTo(b);
-    const dir = b.clone().sub(a).normalize();
-    const DASH = 0.32, GAP = 0.22;
-    for (let s = 0; s < len; s += DASH + GAP) {
-      const l = Math.min(DASH, len - s);
-      const m = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.04, l), M.dash);
-      m.position.copy(a).addScaledVector(dir, s + l / 2);
-      m.lookAt(m.position.clone().add(dir));
-      g.add(m);
+  function resize() {
+    W = mount.clientWidth; H = mount.clientHeight;
+    desktop = window.innerWidth > 1040;
+    renderer.setSize(W, H, false);
+    labels.setSize(W, H);
+    camera.aspect = W / H;
+    if (CAPTURE) camera.setViewOffset(W, H, -W * 0.2, H * 0.02, W, H);
+    else if (desktop) camera.setViewOffset(W, H, -W * 0.17, H * 0.06, W, H);
+    else camera.clearViewOffset();
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  const target = new THREE.Vector3();
+  function placeCamera(t, time, lift) {
+    const sway = !reduceMotion && !CAPTURE;
+    const yaw = view.yaw + (sway ? Math.sin(time * 0.12) * 0.07 : 0);
+    const pitch = view.pitch + (sway ? Math.sin(time * 0.09) * 0.02 : 0);
+    const d = distFor(view.size) + lift;
+    camera.position.set(t.x + Math.sin(yaw) * Math.cos(pitch) * d, t.y + Math.sin(pitch) * d, t.z + Math.cos(yaw) * Math.cos(pitch) * d);
+    camera.lookAt(t);
+    key.position.set(t.x - 10, 52, t.z + 16);
+    key.target.position.copy(t);
+    rim.position.set(t.x + 24, 18, t.z - 30);
+    rim.target.position.copy(t);
+  }
+
+  // ---------- Story ----------
+  const ease = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+  const nameEl = hud.querySelector("[data-name]");
+  const capEl = hud.querySelector("[data-cap]");
+  const countEl = hud.querySelector("[data-count]");
+  let index = 0, fly = null, arrivedAt = 0;
+
+  const showOnly = (...ks) => designs.forEach((D, k) => (D.g.visible = ks.includes(k)));
+  const showLabels = (i) => designs.forEach((D, k) => D.labelEls.forEach((el) => el.classList.toggle("on", k === i)));
+  function setText(i) {
+    hud.classList.add("swap");
+    setTimeout(() => {
+      if (nameEl) nameEl.textContent = designs[i].meta.name;
+      if (capEl) capEl.textContent = designs[i].meta.caption;
+      if (countEl) countEl.textContent = String(i + 1).padStart(2, "0");
+      hud.classList.remove("swap");
+    }, reduceMotion ? 0 : 220);
+  }
+  function setFailover(state) {
+    if (failover.state === state) return;
+    failover.state = state;
+    const failed = state === "failed";
+    failover.fwA.material = failed ? M.ledRed : M.ledOk;
+    failover.fwB.material = failed ? M.ledOk : M.ledAmber;
+    M.wireA.color.set(failed ? "#2a2f3d" : "#6d7690");
+    M.dash.opacity = failed ? 1 : 0.85;
+    failover.labelA.querySelector("span").textContent = failed ? "failed" : "active";
+    failover.labelB.querySelector("span").textContent = failed ? "active" : "standby";
+    failover.labelA.classList.toggle("l3-bad", failed);
+  }
+
+  function go(n, at) {
+    const next = (n + designs.length) % designs.length;
+    if (next === index && !fly) return;
+    const from = target.clone();
+    const prev = index;
+    index = next;
+    showLabels(-1);
+    setText(index);
+    setFailover("ok");
+    const m = designs[index].meta;
+    if (reduceMotion || CAPTURE) {
+      target.copy(designs[index].center);
+      view.pitch = m.pitch; view.size = m.size;
+      showOnly(index); showLabels(index); arrivedAt = at; fly = null;
+      return;
     }
+    showOnly(prev, index);
+    const jump = from.distanceTo(designs[index].center);
+    fly = { from, to: designs[index].center.clone(), start: at, dur: 2 + Math.min(1.4, jump / 120), lift: Math.min(26, jump / 6),
+      p0: view.pitch, p1: m.pitch, s0: view.size, s1: m.size };
   }
-  function dashedRect(g, d, n) {
-    const pad = 6;
-    const c = [[n.x - pad, n.y - pad], [n.x + n.w + pad, n.y - pad], [n.x + n.w + pad, n.y + n.h + pad], [n.x - pad, n.y + n.h + pad]];
-    for (let i = 0; i < 4; i++) dashedSegment(g, toWorld(d, c[i], 0.02), toWorld(d, c[(i + 1) % 4], 0.02));
+
+  target.copy(designs[0].center);
+  showOnly(0);
+  if (!reduceMotion && !CAPTURE) {
+    fly = { from: designs[0].center.clone().add(new THREE.Vector3(-34, 0, -12)), to: designs[0].center.clone(), start: 0, dur: 3.4, lift: 40,
+      p0: 0.66, p1: 0.66, s0: 40, s1: 40 };
+  } else showLabels(0);
+
+  let stopped = reduceMotion || CAPTURE, paused = false, visible = true, now = 0;
+  const DWELL = [15, 8, 8, 8];
+  hud.querySelector("[data-prev]")?.addEventListener("click", () => { stopped = true; go(index - 1, now); });
+  hud.querySelector("[data-next]")?.addEventListener("click", () => { stopped = true; go(index + 1, now); });
+  hud.addEventListener("mouseenter", () => (paused = true));
+  hud.addEventListener("mouseleave", () => (paused = false));
+  new IntersectionObserver(([e]) => { visible = e.isIntersecting; }, { threshold: 0.1 }).observe(hero);
+
+  let placedStill = false;
+  function step(dt) {
+    now += dt;
+    let lift = 0;
+    if (fly) {
+      const t = Math.min(1, (now - fly.start) / fly.dur);
+      const e = ease(t);
+      target.copy(fly.from).lerp(fly.to, e);
+      lift = Math.sin(Math.PI * e) * fly.lift;
+      view.pitch = fly.p0 + (fly.p1 - fly.p0) * e;
+      view.size = fly.s0 + (fly.s1 - fly.s0) * e;
+      if (t >= 1) { fly = null; arrivedAt = now; showOnly(index); showLabels(index); }
+    } else if (!stopped && !paused && now - arrivedAt > DWELL[index]) {
+      go(index + 1, now);
+    }
+
+    // Campus: the active firewall fails a few seconds after arrival, then recovers
+    if (index === 0 && !fly && !reduceMotion && !CAPTURE) {
+      const t = (now - arrivedAt) % 15;
+      setFailover(t > 4.5 && t < 11 ? "failed" : "ok");
+    }
+
+    placeCamera(target, now, lift);
+
+    if (!reduceMotion || !placedStill) {
+      for (const f of flows) {
+        if (f.d !== index && !fly) continue;
+        const live = !f.tag || (f.tag === "A") === (failover.state === "ok");
+        if (!reduceMotion) f.offset += f.speed * dt;
+        const gap = f.total / f.meshes.length;
+        f.meshes.forEach((m, k) => {
+          m.visible = live;
+          if (live) m.position.copy(pointAt(f, f.offset + k * gap));
+        });
+      }
+      placedStill = true;
+    }
+    renderer.render(scene, camera);
+    labels.render(scene, camera);
   }
 
   function pointAt(f, dist) {
@@ -339,140 +551,22 @@ function init() {
     return f.pts[f.pts.length - 1].clone();
   }
 
-  // ---------- Camera framing ----------
-  const view = { yaw: -0.42, pitch: 0.56, dist: 46 };
-  let W = 1, H = 1, desktop = true;
-
-  function resize() {
-    W = mount.clientWidth; H = mount.clientHeight;
-    desktop = window.innerWidth > 1040;
-    renderer.setSize(W, H, false);
-    labels.setSize(W, H);
-    camera.aspect = W / H;
-    // Fit about 27 units of plan into the visible part of the frame
-    const portion = desktop ? 0.54 : 1.06;
-    const need = 27 / portion;
-    const tanHalf = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
-    view.dist = Math.max(need / (2 * tanHalf * camera.aspect), 22 / (2 * tanHalf)) * 1.05;
-    // On desktop push the design into the right half, leaving calm space for the headline
-    if (desktop) camera.setViewOffset(W, H, -W * 0.17, H * 0.07, W, H);
-    else camera.clearViewOffset();
-    camera.updateProjectionMatrix();
-  }
-  window.addEventListener("resize", resize);
-  resize();
-
-  const target = new THREE.Vector3();
-  function placeCamera(t, time, lift = 0) {
-    const yaw = view.yaw + (reduceMotion ? 0 : Math.sin(time * 0.12) * 0.07);
-    const pitch = view.pitch + (reduceMotion ? 0 : Math.sin(time * 0.09) * 0.02);
-    const d = view.dist + lift;
-    camera.position.set(
-      t.x + Math.sin(yaw) * Math.cos(pitch) * d,
-      t.y + Math.sin(pitch) * d,
-      t.z + Math.cos(yaw) * Math.cos(pitch) * d
-    );
-    camera.lookAt(t);
-    key.position.set(t.x - 8, 34, t.z + 12);
-    key.target.position.copy(t);
-    rim.position.set(t.x + 20, 14, t.z - 24);
-    rim.target.position.copy(t);
+  if (CAPTURE) {
+    // Used only to record the GitHub profile banner: time is driven by hand
+    // setLoop(seconds) retimes every flow so packets return to their start after exactly that long
+    const setLoop = (T) => flows.forEach((f) => {
+      const gap = f.total / f.meshes.length;
+      f.speed = Math.max(1, Math.round((f.speed * T) / gap)) * gap / T;
+    });
+    window.__scene = { step, setLoop, go: (n) => go(n, now), fail: (b) => setFailover(b ? "failed" : "ok") };
+    step(0);
+    return;
   }
 
-  // ---------- Story: fly between designs ----------
-  const ease = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
-  let index = 0;
-  let fly = null; // { from, to, start, dur, lift }
-  const nameEl = hud.querySelector("[data-name]");
-  const capEl = hud.querySelector("[data-cap]");
-  const countEl = hud.querySelector("[data-count]");
-
-  function showLabels(i) {
-    groups.forEach((gr, k) => gr.labelEls.forEach((el) => el.classList.toggle("on", k === i)));
-  }
-  function setText(i) {
-    hud.classList.add("swap");
-    setTimeout(() => {
-      nameEl.textContent = DESIGNS[i].name;
-      capEl.textContent = DESIGNS[i].caption;
-      countEl.textContent = String(i + 1).padStart(2, "0");
-      hud.classList.remove("swap");
-    }, reduceMotion ? 0 : 220);
-  }
-
-  function go(n, now) {
-    const next = (n + DESIGNS.length) % DESIGNS.length;
-    if (next === index && fly === null) return;
-    const from = fly ? target.clone() : groups[index].center.clone();
-    index = next;
-    showLabels(-1);
-    setText(index);
-    if (reduceMotion) {
-      target.copy(groups[index].center);
-      view.pitch = groups[index].pitch;
-      showLabels(index);
-      fly = null;
-      return;
-    }
-    const jump = from.distanceTo(groups[index].center);
-    fly = { from, p0: view.pitch, p1: groups[index].pitch, to: groups[index].center.clone(), start: now, dur: 1.6 + Math.min(1.4, jump / 90), lift: Math.min(18, jump / 8) };
-  }
-
-  // Opening shot: settle onto the first design from high and wide
-  target.copy(groups[0].center);
-  if (!reduceMotion) fly = { from: groups[0].center.clone().add(new THREE.Vector3(-26, 0, -8)), to: groups[0].center.clone(), start: 0, dur: 3.2, lift: 30 };
-  else showLabels(0);
-
-  // Controls and autoplay
-  let stopped = reduceMotion, paused = false, visible = true, lastSwitch = 0, clockNow = 0;
-  const DWELL = 6.5;
-  hud.querySelector("[data-prev]").addEventListener("click", () => { stopped = true; go(index - 1, clockNow); });
-  hud.querySelector("[data-next]").addEventListener("click", () => { stopped = true; go(index + 1, clockNow); });
-  hud.addEventListener("mouseenter", () => (paused = true));
-  hud.addEventListener("mouseleave", () => (paused = false));
-  new IntersectionObserver(([e]) => { visible = e.isIntersecting; }, { threshold: 0.1 }).observe(hero);
-
-  showLabels(reduceMotion ? 0 : -1);
-
-  // ---------- Loop ----------
   const clock = new THREE.Clock();
-  function frame() {
+  (function frame() {
     requestAnimationFrame(frame);
     if (!visible || document.hidden) { clock.getDelta(); return; }
-    const dt = Math.min(clock.getDelta(), 0.05);
-    clockNow += dt;
-    const now = clockNow;
-
-    let lift = 0;
-    if (fly) {
-      const t = Math.min(1, (now - fly.start) / fly.dur);
-      const e = ease(t);
-      target.copy(fly.from).lerp(fly.to, e);
-      lift = Math.sin(Math.PI * e) * fly.lift;
-      if (fly.p1 !== undefined) view.pitch = fly.p0 + (fly.p1 - fly.p0) * e;
-      if (t >= 1) { fly = null; lastSwitch = now; showLabels(index); }
-    } else if (!stopped && !paused && now - lastSwitch > DWELL) {
-      go(index + 1, now);
-    }
-    placeCamera(target, now, lift);
-
-    if (!reduceMotion) {
-      for (const f of flows) {
-        if (Math.abs(f.d - index) > 1 && !fly) continue;
-        f.offset += f.speed * dt;
-        const gap = f.total / f.meshes.length;
-        f.meshes.forEach((m, k) => m.position.copy(pointAt(f, f.offset + k * gap)));
-      }
-    } else if (!frame.placed) {
-      for (const f of flows) {
-        const gap = f.total / f.meshes.length;
-        f.meshes.forEach((m, k) => m.position.copy(pointAt(f, f.offset + k * gap)));
-      }
-      frame.placed = true;
-    }
-
-    renderer.render(scene, camera);
-    labels.render(scene, camera);
-  }
-  frame();
+    step(Math.min(clock.getDelta(), 0.05));
+  })();
 }
