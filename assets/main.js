@@ -1,5 +1,29 @@
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+// Keep the sticky navigation useful while reading long sections.
+(function sectionNav() {
+  const links = [...document.querySelectorAll(".nav-links a[href^='#']")];
+  const sections = links
+    .map((link) => document.getElementById(link.getAttribute("href").slice(1)))
+    .filter(Boolean);
+  if (!links.length || !sections.length || !("IntersectionObserver" in window)) return;
+
+  const setCurrent = (id) => links.forEach((link) => {
+    link.toggleAttribute("aria-current", link.getAttribute("href") === `#${id}`);
+  });
+
+  links.forEach((link) => link.addEventListener("click", () => {
+    setCurrent(link.getAttribute("href").slice(1));
+  }));
+
+  const observer = new IntersectionObserver((entries) => {
+    const current = entries.filter((entry) => entry.isIntersecting)
+      .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+    if (current) setCurrent(current.target.id);
+  }, { rootMargin: "-24% 0px -62% 0px", threshold: [0, 0.25, 0.5, 0.75, 1] });
+  sections.forEach((section) => observer.observe(section));
+})();
+
 // Heimdall-style alert feed. Illustrative data only: addresses come from the
 // ranges reserved for documentation (192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24).
 (function feed() {
